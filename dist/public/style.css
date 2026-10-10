@@ -1,0 +1,418 @@
+/* SPDX-License-Identifier: MIT */
+.shortcuts-wrap {
+    flex: 0 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    /* match HFS's list width; the .tiles-mode rule below widens it back in tiles mode */
+    max-width: 54em;
+    margin: .4em auto .2em;
+}
+
+/* follow HFS tiles mode: span the full width when the file list is in tiles mode */
+.tiles-mode .shortcuts-wrap {
+    max-width: none;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* hover-to-reveal: keep a thin strip that can be hovered so the collapsed bar can be revealed */
+.shortcuts-wrap.shortcuts-hover-strip {
+    min-height: 1.6em;
+}
+
+/* ...unless the admin disabled tiles mode for that bar */
+.tiles-mode .shortcuts-wrap.shortcuts-tiles-off {
+    max-width: 54em;
+}
+
+.shortcuts-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5em;
+    padding: .4em;
+    border-radius: .5em;
+    border: 1px dashed transparent;
+    box-sizing: border-box;
+}
+
+.shortcuts-bar.editing {
+    border-color: var(--faint-contrast);
+}
+
+.shortcuts-wrap .shortcut-shared {
+    cursor: default;
+}
+
+/* "Icons across" fit mode: give every icon an equal 1/N slot of the row */
+.shortcuts-bar.columns .shortcut {
+    flex: 0 0 calc(100% / var(--shortcut-columns, 6));
+    width: auto;
+    max-width: 100%;
+}
+
+/* a wide icon spans two of those slots */
+.shortcuts-bar.columns .shortcut-wide {
+    flex: 0 0 calc(200% / var(--shortcut-columns, 6));
+    width: auto;
+}
+
+/* wide icons fill the tile's full height; the extra width is cropped (length doesn't matter) */
+.shortcuts-wrap .shortcut-wide .shortcut-link {
+    overflow: hidden;
+}
+
+.shortcuts-wrap .shortcut-wide .shortcut-img {
+    width: auto;
+    height: 100%;
+    max-width: none;
+    max-height: 100%;
+}
+
+.shortcut {
+    position: relative;
+    width: var(--shortcut-icon, 2.6em);
+    height: var(--shortcut-icon, 2.6em);
+    box-sizing: border-box;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: .4em;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    user-select: none;
+    -webkit-touch-callout: none; /* let press-and-hold open Customize instead of the native menu */
+}
+
+.shortcut:hover {
+    border-color: var(--mild-contrast);
+    background: var(--ghost-contrast);
+}
+
+.shortcut-link {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    overflow: hidden; /* clip a zoomed/oversized icon to the tile */
+}
+
+.shortcut-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: .3em;
+    -webkit-user-drag: none;
+    user-select: none;
+    transform: scale(var(--shortcut-zoom, 1));
+}
+
+.shortcut-emoji {
+    font-size: calc(var(--shortcut-icon, 2.6em) * .6);
+    line-height: 1;
+    color: var(--text-high-contrast);
+    -webkit-user-drag: none;
+    user-select: none;
+    transform: scale(var(--shortcut-zoom, 1));
+}
+
+.shortcut-add {
+    border: 1px dashed var(--mild-contrast);
+    font-size: 1.4em;
+    line-height: 1;
+    color: var(--text);
+}
+
+.shortcut-add:hover {
+    background: var(--ghost-contrast);
+}
+
+/* the "···" button on its own line above the bar opens/closes Customize */
+.shortcuts-menu-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: .2em;
+}
+
+.shortcut-menu {
+    font-size: 1.5em;
+    line-height: 1;
+    font-weight: bold;
+    letter-spacing: .18em; /* space the three dots apart */
+    padding-left: .18em;   /* balance the trailing letter-spacing */
+    color: var(--text);
+    background: none;
+    border-color: transparent;
+    outline: none;
+    box-shadow: none;
+}
+
+/* the "···" button never shades or shows an outline */
+.shortcut-menu:hover,
+.shortcut-menu:focus,
+.shortcut-menu:focus-visible {
+    background: none;
+    border-color: transparent;
+    outline: none;
+    box-shadow: none;
+}
+
+.shortcut-btn {
+    /* scale the badge with the icon so small icons don't collide (--shortcut-icon comes from the row) */
+    --badge: min(22px, calc(var(--shortcut-icon, 26px) * .42));
+    position: absolute;
+    width: var(--badge);
+    height: var(--badge);
+    padding: 0;
+    font-size: calc(var(--badge) * .72);
+    line-height: 1;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    background: var(--button-bg);
+    color: var(--button-text);
+    opacity: 0;
+    transition: opacity .15s;
+    z-index: 2;
+}
+
+.shortcut:hover .shortcut-btn {
+    opacity: 1;
+}
+
+/* while editing, keep the badges visible without hover (better on touch devices) */
+.shortcut-editing .shortcut-btn {
+    opacity: 1;
+}
+
+/* keep the badges inside the tile, a little in from the corners (inset scales with the badge) */
+.shortcut-remove { top: calc(var(--badge) * .12); right: calc(var(--badge) * .12); }
+.shortcut-edit { bottom: calc(var(--badge) * .12); right: calc(var(--badge) * .12); }
+.shortcut-share { top: calc(var(--badge) * .12); left: calc(var(--badge) * .12); }
+.shortcut-move { bottom: calc(var(--badge) * .12); left: calc(var(--badge) * .12); cursor: grab; touch-action: none; }
+.shortcut-dragging { opacity: .5; }
+.shortcut-share.on {
+    background-color: var(--success);
+    color: #fff;
+}
+
+.shortcuts-empty {
+    color: var(--text);
+    opacity: .7;
+    font-style: italic;
+}
+
+.shortcuts-autoicon button.as-text,
+.shortcuts-editor-buttons button.as-text {
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--link);
+    cursor: pointer;
+}
+
+/* editor dialog */
+.shortcuts-editor {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, .45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    box-sizing: border-box;
+}
+
+.shortcuts-editor form {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--faint-contrast);
+    border-radius: .6em;
+    padding: 1em;
+    width: min(26em, 92vw);
+    max-height: 90vh;
+    overflow: auto;
+    display: grid;
+    gap: .7em;
+    box-shadow: 0 .5em 2em rgba(0, 0, 0, .4);
+}
+
+.shortcuts-editor h3 {
+    margin: 0;
+    color: var(--text-high-contrast);
+}
+
+.shortcuts-editor label {
+    display: grid;
+    gap: .3em;
+    font-size: .9em;
+}
+
+.shortcuts-editor input[type=text],
+.shortcuts-editor input[type=file] {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.shortcuts-icon-picker {
+    display: flex;
+    gap: .6em;
+    align-items: center;
+}
+
+.shortcuts-icon-preview {
+    width: var(--shortcut-icon, 2.6em);
+    height: var(--shortcut-icon, 2.6em);
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--faint-contrast);
+    border-radius: .4em;
+    overflow: hidden;
+}
+
+.shortcuts-autoicon {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6em;
+    font-size: .8em;
+    opacity: .85;
+    margin-top: -.3em;
+}
+
+/* candidate icon picker in the editor */
+.shortcuts-icon-candidates {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .4em;
+    margin-top: -.2em;
+    font-size: .8em;
+}
+
+.shortcuts-icon-candidates-label {
+    opacity: .8;
+}
+
+.shortcuts-icon-candidate {
+    width: 2em;
+    height: 2em;
+    padding: .15em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--faint-contrast);
+    border-radius: .3em;
+    background: var(--ghost-contrast);
+    cursor: pointer;
+}
+
+.shortcuts-icon-candidate:hover {
+    border-color: var(--mild-contrast);
+}
+
+.shortcuts-icon-candidate img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.shortcuts-editor-buttons {
+    display: flex;
+    gap: .5em;
+    justify-content: flex-end;
+    margin-top: .3em;
+}
+
+.shortcuts-editor-buttons button.danger {
+    background-color: var(--error);
+}
+
+/* the three buttons in the Import popup */
+.shortcuts-import-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .6em;
+    margin-top: .8em;
+}
+
+/* inline layout controls shown while in Customize mode */
+.shortcuts-settings {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: .8em;
+    margin-top: .4em;
+    padding: .5em .6em;
+    border: 1px solid var(--faint-contrast);
+    border-radius: .5em;
+    background: var(--ghost-contrast);
+    font-size: .85em;
+}
+
+.shortcuts-settings-fields {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: .8em;
+}
+
+.shortcuts-settings label {
+    display: grid;
+    gap: .2em;
+    color: var(--text);
+}
+
+/* "Wide (2 columns)" checkbox in the editor */
+.shortcuts-editor .shortcuts-check {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: .4em;
+}
+
+/* "Don't ask again" checkbox inside the confirmation dialog */
+.shortcuts-dont-ask {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: .4em;
+    margin-top: .6em;
+    font-size: .95em;
+    opacity: .9;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Wide + Zoom on one line in the editor */
+.shortcuts-editor .shortcuts-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1em;
+}
+
+/* push Done to the right end of the settings line */
+.shortcuts-settings .shortcuts-done {
+    margin-left: auto;
+}
+
+.shortcuts-settings input[type=number],
+.shortcuts-settings select {
+    width: 6em;
+}
+
+/* keep icons hidden-but-clickable on touch devices where there is no hover */
+@media (hover: none) {
+    .shortcut-btn { opacity: .8; }
+}
