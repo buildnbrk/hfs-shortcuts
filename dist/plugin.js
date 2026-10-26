@@ -9,6 +9,18 @@
 // Each signed-in user keeps their own set; admins can flag individual icons to be shared with everyone.
 
 exports.version = 1.1
+
+// Changelog shown by the admin panel (Plugins → updates): only the entries newer than the
+// installed version are listed. HFS reads this statically, as *[STATIC JSON]*, so keep it a
+// plain JSON array — double-quoted keys/strings, no trailing commas, no comments and no
+// nested arrays (the value is captured up to the first closing bracket).
+exports.changelog = [
+    {
+        "version": 1.1,
+        "message": "Blank tiles are no longer drawn as links: a shortcut with no URL renders without the hover box and the pointer cursor.\n• Revealing a hidden bar with the ··· now scrolls the icons into view instead of leaving them off-screen.\n• New admin settings “Header bar position” and “Main bar position”: each bar can go above the header, below the header, above the file list or below the file list.\n• When both bars are put in the slot above the list, the header bar is drawn first, so the order is predictable."
+    }
+]
+
 exports.description = "Adds customizable shortcut/launcher bars. A main bar under the file list for web shortcuts, and a header bar for site-internal links. Add a shortcut with the + button and set its URL. Each signed-in user keeps their own set, and the admin can mark single icons to be shared with everyone."
 exports.apiRequired = 11.6 // customRest, openDb, notifyClient, subscribeConfig, getCurrentUsername, getAccount, getUsernames
 
