@@ -44,6 +44,17 @@
     cursor: default;
 }
 
+/* a tile with no URL (blank/spacer) isn't a link: no pointer cursor and no link box on
+   hover -- except while customizing, where every tile stays a highlighted drop target */
+.shortcuts-wrap .shortcut-nolink:not(.shortcut-editing) {
+    cursor: default;
+}
+
+.shortcuts-wrap .shortcut-nolink:not(.shortcut-editing):hover {
+    border-color: transparent;
+    background: transparent;
+}
+
 /* "Icons across" fit mode: give every icon an equal 1/N slot of the row */
 .shortcuts-bar.columns .shortcut {
     flex: 0 0 calc(100% / var(--shortcut-columns, 6));

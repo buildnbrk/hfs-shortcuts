@@ -2,8 +2,10 @@
 
 An [HFS](https://github.com/rejetto/hfs) plugin that adds **launcher bars of icon shortcuts**, managed entirely from the frontend. One engine drives two bars:
 
-- **Main bar** — shown under the file list (`afterList`), for web shortcuts.
-- **Header bar** — shown above the header (`beforeHeader`), for the site's own internal links.
+- **Main bar** — for web shortcuts. Shown below the file list by default.
+- **Header bar** — for the site's own internal links. Shown above the header by default.
+
+Each bar can be placed above the header, below the header, above the file list or below the file list — admin settings, so the bars can be rearranged without editing the code.
 
 Both bars share the same Customize UI, storage scheme, sharing rules and drag-and-drop behaviour.
 
@@ -58,10 +60,12 @@ While customizing, admins see a ✔ box on their own icons. Ticking it shares **
 
 | Setting | Meaning |
 |---|---|
-| **Enable header shortcut bar** | Turn the above-header nav bar on/off. |
+| **Enable header shortcut bar** | Turn the header nav bar on/off. |
+| **Header bar position** | Where the header bar goes: **Above the header** (default), **Below the header**, **Above the file list** or **Below the file list**. |
 | **Disable tiles mode for the header bar** | When HFS is in tiles mode the header bar spans the full width; turn this on to keep it at the list width instead. |
 | **Lock the header bar** | Non-admin users can't add their own shortcuts or change the bar's layout or shared icons — they only see what you set. |
-| **Enable main shortcut bar** | Turn the under-list launcher bar on/off. |
+| **Enable main shortcut bar** | Turn the launcher bar on/off. |
+| **Main bar position** | Where the launcher bar goes: **Below the file list** (default), **Above the file list**, **Below the header** or **Above the header**. |
 | **Disable tiles mode for the main bar** | When HFS is in tiles mode the main bar spans the full width, matching the file list; turn this on to keep it at the list width instead. |
 | **Lock the main bar** | Non-admin users can't add their own shortcuts or change the bar's layout or shared icons — they only see what you set. |
 | **Show the bars to visitors who are not signed in** | If off, both bars are hidden until login. |
@@ -71,16 +75,33 @@ The admin's *Customize* settings are the defaults for everyone; each user can ad
 
 ## Placement
 
-The two bars attach to the frontend `afterList` and `beforeHeader` events. To move either, change the event name in [`public/main.js`](public/main.js):
+Both bars offer the same four placements (**Header bar position** / **Main bar position**), but HFS only has three slots to mount on:
+
+| Placement | HFS slot |
+|---|---|
+| Above the header | `beforeHeader` |
+| Below the header | `afterHeader` |
+| Above the file list | `afterHeader` |
+| Below the file list | `afterList` |
+
+HFS has no `beforeList` event: its only slot ahead of the file list is `afterHeader`, which sits just below the header (after the breadcrumbs, before the folder comment and the list). So **Below the header** and **Above the file list** land in the same place — they are offered separately because that is how the two bars are thought about.
+
+When both bars pick that shared slot, the order between them follows the chosen placement (`belowHeader` before `aboveList`), with the header bar winning a tie; this uses the event's `setOrder()`. The placement table lives in [`public/main.js`](public/main.js):
 
 ```js
+const POSITIONS = {
+    aboveHeader: { slot: 'beforeHeader', rank: 1 },
+    belowHeader: { slot: 'afterHeader',  rank: 2 },
+    aboveList:   { slot: 'afterHeader',  rank: 3 },
+    belowList:   { slot: 'afterList',    rank: 4 },
+}
 if (config.enabled !== false)
-    HFS.onEvent('afterList', () => h(ShortcutBar, { bar: 'main' }))
+    mountBar('main', config.mainPosition)      // default 'belowList'
 if (config.headerEnabled !== false)
-    HFS.onEvent('beforeHeader', () => h(ShortcutBar, { bar: 'header' }))
+    mountBar('header', config.headerPosition)  // default 'aboveHeader'
 ```
 
-Other options include `afterMenuBar`, `afterHeader`, `footer`, etc.
+Other slots HFS offers include `afterMenuBar`, `afterBreadcrumbs`, `afterFolderStats` and `footer`; add an entry to `POSITIONS` (plus a matching `POSITION_OPTIONS` value in [`plugin.js`](plugin.js)) to expose one as a placement.
 
 ## Storage
 

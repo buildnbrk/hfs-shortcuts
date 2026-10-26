@@ -45,11 +45,43 @@
         return out
     }
 
-    // two bars share this component: the main launcher under the list, the header nav above it
+    // Two bars share this component. The admin picks one of four placements for each bar:
+    // above the header, below the header, above the file list, below the file list.
+    // HFS exposes only three slots (beforeHeader, afterHeader, afterList) and has no
+    // "beforeList", so "Below the header" and "Above the file list" share afterHeader — the
+    // one spot ahead of the file list. `rank` orders two bars that land on the same slot.
+    const POSITIONS = {
+        aboveHeader: { slot: 'beforeHeader', rank: 1 },
+        belowHeader: { slot: 'afterHeader', rank: 2 },
+        aboveList: { slot: 'afterHeader', rank: 3 },
+        belowList: { slot: 'afterList', rank: 4 },
+    }
+    // plain HFS event names, still accepted (saved by an earlier version of this plugin)
+    const LEGACY_POSITIONS = { beforeHeader: 'aboveHeader', afterHeader: 'belowHeader', afterList: 'belowList' }
+    const DEFAULT_POSITION = { header: 'aboveHeader', main: 'belowList' }
+
+    // any unknown/missing value falls back to the bar's default placement
+    function resolvePosition(value, bar) {
+        const name = POSITIONS[value] ? value : LEGACY_POSITIONS[value] || DEFAULT_POSITION[bar]
+        return POSITIONS[name]
+    }
+
+    function mountBar(bar, configured) {
+        const { slot, rank } = resolvePosition(configured, bar)
+        // inside the shared afterHeader slot a bar placed "above the list" sits closer to the
+        // list than one placed "below the header"; the header bar wins a tie (lower goes first)
+        const order = rank + (bar === 'main' ? .1 : 0)
+        HFS.onEvent(slot, (params, extra) => {
+            // setOrder is newer than this plugin's apiRequired, so don't assume it's there
+            if (typeof extra?.setOrder === 'function') extra.setOrder(order)
+            return h(ShortcutBar, { bar })
+        })
+    }
+
     if (config.enabled !== false)
-        HFS.onEvent('afterList', () => h(ShortcutBar, { bar: 'main' }))
+        mountBar('main', config.mainPosition)
     if (config.headerEnabled !== false)
-        HFS.onEvent('beforeHeader', () => h(ShortcutBar, { bar: 'header' }))
+        mountBar('header', config.headerPosition)
 
     const rest = {
         load: bar => HFS.customRestCall('shortcuts_getAll', { bar }),
@@ -85,6 +117,8 @@
         // collapsed = showing only the "···"; driven by the bar's Show/Hide/Hover mode
         const [collapsed, setCollapsed] = React.useState(false)
         const importModeRef = React.useRef('replace') // 'replace' | 'add', chosen by the Import dialog
+        const barRef = React.useRef(null) // the icons row, so revealing it can scroll to it
+        const revealPending = React.useRef(false) // the ··· expanded the bar: scroll it into view
 
         const reload = React.useCallback(() => {
             rest.load(bar).then(
@@ -143,6 +177,26 @@
         // (re)collapse to match the mode whenever it changes; the ··· still toggles it at runtime
         React.useEffect(() => { setCollapsed(autoHideEff) }, [autoHideEff])
         const showBar = autoHideEff ? (editing || !collapsed) : true
+
+        // The revealed icons sit *below* the ··· line, so when the ··· is near the bottom of the
+        // page the bar would appear off-screen and the click would look like it did nothing.
+        // After a reveal, scroll just enough to bring the whole row of icons into view.
+        React.useEffect(() => {
+            if (collapsed || !revealPending.current) return
+            revealPending.current = false
+            // the row was just mounted; wait one frame so its height is measurable
+            const frame = requestAnimationFrame(() => {
+                const el = barRef.current
+                if (!el || typeof el.scrollIntoView !== 'function') return
+                const viewport = window.innerHeight || document.documentElement.clientHeight || 0
+                // a bar taller than the viewport reads better from its first row; otherwise
+                // 'nearest' scrolls only as far as needed to show the whole bar
+                const tall = el.getBoundingClientRect().height > viewport * .9
+                const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                el.scrollIntoView({ block: tall ? 'start' : 'nearest', behavior: reduce ? 'auto' : 'smooth' })
+            })
+            return () => cancelAnimationFrame(frame)
+        }, [collapsed])
 
         if (config.showForGuests === false && !signedIn)
             return null
@@ -219,7 +273,11 @@
         function menuClick() {
             if (press.current.long) { press.current.long = false; return }
             if (editing) { setEditing(false); setDraft(null); return }
-            if (autoHideEff) { setCollapsed(v => !v); return }
+            if (autoHideEff) {
+                if (collapsed) revealPending.current = true // reveal: scroll the icons into view
+                setCollapsed(v => !v)
+                return
+            }
             if (canEditList) setEditing(true)
         }
         function menuDown() {
@@ -355,27 +413,34 @@
         function renderTile(item, key, index, pos, from) {
             const editingTile = listEditing && index != null // your own icon: edit/remove/share
             const dragging = dragList && dragFrom.current === pos && pos != null
+            // a tile without a URL (blank/spacer) isn't a link: don't render an anchor or its hover box
+            const href = safeUrl(item.url)
             const props = {
                 key,
                 className: 'shortcut'
                     + (listEditing ? ' shortcut-editing' : '')
                     + (index == null ? ' shortcut-shared' : '')
+                    + (href ? '' : ' shortcut-nolink')
                     + (item.wide ? ' shortcut-wide' : '')
                     + (dragging ? ' shortcut-dragging' : ''),
                 title: item.label || item.url,
                 style: { '--shortcut-zoom': String((item.zoom || 100) / 100) },
             }
             if (listEditing) props['data-own-index'] = pos // every tile is a drop target
+            const innerProps = {
+                className: 'shortcut-link', draggable: false,
+                onPointerDown: tileDown, onPointerUp: tileUp, onPointerLeave: tileUp,
+                onClick: e => {
+                    if (listEditing) { e.preventDefault(); return } // don't open while editing
+                    if (press.current.long) { press.current.long = false; e.preventDefault(); return }
+                    if (!editing && autoHideEff) setCollapsed(true) // back to ··· after opening
+                },
+            }
+            if (href) Object.assign(innerProps, {
+                href, target: linkTarget(item.url), rel: 'noopener',
+            })
             return h('div', props,
-                h('a', {
-                    className: 'shortcut-link', href: safeUrl(item.url) || undefined, target: linkTarget(item.url), rel: 'noopener', draggable: false,
-                    onPointerDown: tileDown, onPointerUp: tileUp, onPointerLeave: tileUp,
-                    onClick: e => {
-                        if (listEditing) { e.preventDefault(); return } // don't open while editing
-                        if (press.current.long) { press.current.long = false; e.preventDefault(); return }
-                        if (!editing && autoHideEff) setCollapsed(true) // back to ··· after opening
-                    },
-                }, h(IconView, { icon: item.icon })),
+                h(href ? 'a' : 'span', innerProps, h(IconView, { icon: item.icon })),
                 editingTile && admin && h('button', {
                     type: 'button', title: t('shortcuts_share', 'Share with everyone'),
                     className: 'shortcut-btn shortcut-share' + (item.share ? ' on' : ''),
@@ -410,6 +475,7 @@
             const rowGap = num(lay.lineGap, 0, 60, defaults.lineGap)
             const isEditing = editable && listEditing
             return h('div', {
+                ref: barRef,
                 className: 'shortcuts-bar columns'
                     + (isEditing ? ' editing' : ''),
                 style: {

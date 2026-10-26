@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Shortcut Bar - an HFS plugin
 // A launcher of icon shortcuts. Two bars share one engine:
-//   - "main"   -> shown under the file list (afterList), for web shortcuts
-//   - "header" -> shown above the header (beforeHeader), for the site's own internal links
+//   - "main"   -> for web shortcuts
+//   - "header" -> for the site's own internal links
+// Either bar can be placed above the header (beforeHeader), below the header or above the
+// file list (both afterHeader — the only slot ahead of the list), or below the list (afterList).
+// The admin picks per bar via mainPosition / headerPosition in exports.config.
 // Each signed-in user keeps their own set; admins can flag individual icons to be shared with everyone.
 
-exports.version = 1
+exports.version = 1.1
 exports.description = "Adds customizable shortcut/launcher bars. A main bar under the file list for web shortcuts, and a header bar for site-internal links. Add a shortcut with the + button and set its URL. Each signed-in user keeps their own set, and the admin can mark single icons to be shared with everyone."
 exports.apiRequired = 11.6 // customRest, openDb, notifyClient, subscribeConfig, getCurrentUsername, getAccount, getUsernames
 
@@ -61,6 +64,17 @@ const DEFAULT_HEADER_LAYOUT = {
     visibility: 'show', // 'show' | 'hide' | 'hover'
 }
 
+// The placements an admin can pick for either bar. HFS only exposes three usable slots
+// (beforeHeader, afterHeader, afterList) and no "beforeList", so "Below the header" and
+// "Above the file list" both mount on afterHeader — the single spot ahead of the file list.
+// They are still offered separately because that is how the two bars are thought about.
+const POSITION_OPTIONS = [
+    { label: 'Above the header', value: 'aboveHeader' },
+    { label: 'Below the header', value: 'belowHeader' },
+    { label: 'Above the file list', value: 'aboveList' },
+    { label: 'Below the file list', value: 'belowList' },
+]
+
 // Key order here is the order the settings appear in the Admin panel, so the
 // header-bar options are listed before the main-bar ones.
 exports.config = {
@@ -69,6 +83,14 @@ exports.config = {
         label: "Enable header shortcut bar",
         helperText: "A bar shown above the header, meant for the site's own internal links.",
         defaultValue: true,
+        frontend: true,
+    },
+    headerPosition: {
+        type: 'select',
+        label: "Header bar position",
+        helperText: "Where the header bar is shown. Above the header is the default. Below the header and Above the file list share one slot in HFS (the only one ahead of the list); if both bars pick it, the header bar is drawn first.",
+        defaultValue: 'aboveHeader',
+        options: POSITION_OPTIONS,
         frontend: true,
     },
     disableTilesHeader: {
@@ -90,6 +112,14 @@ exports.config = {
         label: "Enable main shortcut bar",
         helperText: "The launcher bar shown under the file list.",
         defaultValue: true,
+        frontend: true,
+    },
+    mainPosition: {
+        type: 'select',
+        label: "Main bar position",
+        helperText: "Where the main bar is shown. Below the file list is the default. Above the file list and Below the header share one slot in HFS (the only one ahead of the list); if both bars pick it, the header bar is drawn first.",
+        defaultValue: 'belowList',
+        options: POSITION_OPTIONS,
         frontend: true,
     },
     disableTilesMain: {
@@ -135,7 +165,7 @@ exports.init = async api => {
     const globalsCache = new Map()      // bar name -> { at, promise }
 
     // Let every open frontend know the shortcuts changed, so the bars refresh live.
-    api.subscribeConfig(['enabled', 'headerEnabled', 'showForGuests', 'disableTilesMain', 'disableTilesHeader', 'lockMain', 'lockHeader', 'holdMs'], notify)
+    api.subscribeConfig(['enabled', 'headerEnabled', 'mainPosition', 'headerPosition', 'showForGuests', 'disableTilesMain', 'disableTilesHeader', 'lockMain', 'lockHeader', 'holdMs'], notify)
 
     // One engine, two bars. "main" keeps the original storage keys for backward compatibility.
     const BARS = {
